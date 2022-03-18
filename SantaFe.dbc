@@ -1,0 +1,102 @@
+VERSION ""
+
+
+NS_ :
+NS_DESC_
+CM_
+BA_DEF_
+BA_
+VAL_
+CAT_DEF_
+CAT_
+FILTER
+BA_DEF_DEF_
+EV_DATA_
+ENVVAR_DATA_
+SGTYPE_
+SGTYPE_VAL_
+BA_DEF_SGTYPE_
+BA_SGTYPE_
+SIG_TYPE_REF_
+VAL_TABLE_
+SIG_GROUP_
+SIG_VALTYPE_
+SIGTYPE_VALTYPE_
+BO_TX_BU_
+BA_DEF_REL_
+BA_REL_
+BA_DEF_DEF_REL_
+BU_SG_REL_
+BU_EV_REL_
+BU_BO_REL_
+SG_MUL_VAL_
+
+BS_:
+
+BU_:
+
+
+BO_ 3221225472 VECTOR__INDEPENDENT_SIG_MSG: 0 Vector__XXX
+SG_ NewSignal_0007 : 24|8@1+ (1,0) [0|0] "" Vector__XXX
+SG_ NewSignal_0008 : 32|8@1+ (1,0) [0|0] "" Vector__XXX
+SG_ NewSignal_0006 : 16|8@1+ (1,0) [0|0] "" Vector__XXX
+
+BO_ 336 Control_CMD: 8 Vector__XXX
+SG_ Override_Off : 7|8@0+ (1,0) [0|1] "None" Vector__XXX
+SG_ Alive_Count : 15|8@0+ (1,0) [0|255] "None" Vector__XXX
+SG_ Angular_Speed_CMD : 47|8@0+ (1,0) [0|255] "None" Vector__XXX
+
+BO_ 338 Driving_CMD: 8 Vector__XXX
+SG_ Accel_CMD : 7|16@0+ (1,0) [650|3400] "" Vector__XXX
+SG_ Break_CMD : 23|16@0+ (1,0) [0|17000] "" Vector__XXX
+SG_ Steering_CMD : 39|16@0- (1,0) [-520|520] "deg" Vector__XXX
+SG_ Gear_Shift_CMD : 55|8@0+ (1,0) [0|7] "" Vector__XXX
+SG_ Reserved : 63|8@0+ (1,0) [0|0] "" Vector__XXX
+
+BO_ 81 Vehicle_Info_1: 8 Vector__XXX
+SG_ APS_Feedback : 7|16@0+ (1,0) [0|3800] "" Vector__XXX
+SG_ Break_ACT_Feedback : 23|16@0+ (1,0) [0|35000] "" Vector__XXX
+SG_ Gear_Shift_Feedback : 39|8@0+ (1,0) [0|0] "" Vector__XXX
+SG_ Steering_Angle_Feedback : 47|16@0- (1,0) [-540|540] "" Vector__XXX
+SG_ Switch_State : 63|8@0+ (1,0) [0|0] "" Vector__XXX
+
+BO_ 82 Vehicle_Info_2: 8 Vector__XXX
+SG_ Override_Feedback : 7|8@0+ (1,0) [0|6] "" Vector__XXX
+SG_ Vehicle_Speed : 15|16@0+ (1,0) [0|255] "km/h" Vector__XXX
+SG_ Turn_Sig_Feed : 31|8@0+ (1,0) [0|0] "" Vector__XXX
+SG_ APS_Feed : 39|16@0+ (1,0) [0|0] "" Vector__XXX
+SG_ BPS_Feed : 55|8@0+ (1,0) [0|0] "" Vector__XXX
+
+BO_ 83 Vehicle_Info_3: 8 Vector__XXX
+SG_ RPM : 7|16@0+ (1,0) [0|0] "rpm" Vector__XXX
+
+BO_ 84 Vehicle_Info_4: 8 Vector__XXX
+SG_ Wheel_Speed_Front_Right : 7|16@0+ (1,0) [0|255] "km/h" Vector__XXX
+SG_ Wheel_Speed_Front_Left : 23|16@0+ (1,0) [0|255] "km/h" Vector__XXX
+SG_ Wheel_Speed_Rear_Left : 39|16@0+ (1,0) [0|255] "km/h" Vector__XXX
+SG_ Wheel_Speed_Rear_Right : 55|16@0+ (1,0) [0|255] "km/h" Vector__XXX
+
+CM_ SG_ 336 Override_Off "";
+CM_ SG_ 336 Alive_Count "Heartbeat";
+CM_ SG_ 336 Angular_Speed_CMD "steering";
+CM_ SG_ 338 Accel_CMD "Accel Actuator CMD";
+CM_ SG_ 338 Break_CMD "Break actuator CMD";
+CM_ SG_ 338 Steering_CMD "- left + right";
+CM_ SG_ 81 APS_Feedback "Accel actuator feedback";
+CM_ SG_ 81 Break_ACT_Feedback "Break actuator feedback
+";
+CM_ SG_ 81 Gear_Shift_Feedback "Gear Feedback (OBD2)";
+CM_ SG_ 81 Steering_Angle_Feedback "- left + right";
+CM_ SG_ 82 Override_Feedback "Override Feedback
+";
+CM_ SG_ 82 Vehicle_Speed "Vehicle Speed";
+CM_ SG_ 82 Turn_Sig_Feed "Lamp";
+CM_ SG_ 83 RPM "Engine RPM";
+CM_ SG_ 84 Wheel_Speed_Front_Right "Front Right";
+CM_ SG_ 84 Wheel_Speed_Front_Left "Front Left";
+CM_ SG_ 84 Wheel_Speed_Rear_Left "Rear Left";
+CM_ SG_ 84 Wheel_Speed_Rear_Right "Rear Right";
+VAL_ 336 Override_Off 0 "override_on" 1 "override_off" ;
+VAL_ 338 Gear_Shift_CMD 0 "Parking" 5 "Driving" 6 "Neutral" 7 "Reverse" ;
+VAL_ 81 Gear_Shift_Feedback 0 "Parking" 5 "Driving" 6 "Neutral" 7 "Reverse" ;
+VAL_ 82 Override_Feedback 0 "Manual" 1 "Auto" 2 "Steer" 3 "Accel" 4 "Brake" 5 "Sensor" 6 "E-Stop" ;
