@@ -3,9 +3,8 @@ import cantools
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import pygame
-import time
+import datetime as dt
 
-fig, (ax1, ax2, ax3) = plt.subplots(3,1, sharex=True)  # ax1 : vehicle speed ax2 : APS_Feedback(accel) ax3 : Break_ACT_Feedback(break)
 
 CAN_FEEDBACK_NAME = ["APS_Feedback", "Break_ACT_Feedback","Steering_Angle_Feedback","Override_Feedback", "Vehicle_Speed","Turn_Sig_Feed"]
 
@@ -40,7 +39,7 @@ class CAN(object):
                               "Steering_Angle_Feedback":0,"Override_Feedback":0, "Vehicle_Speed":0,"Turn_Sig_Feed":0}
 
     def feedback(self):
-        msg = self.bus.recv(0.5)
+        msg = 1
         is_updated = False
         while msg is not None:
             msg = self.bus.recv(1)
@@ -59,8 +58,37 @@ class CAN(object):
 
 rx_can = CAN()
 
-clock = pygame.time.Clock()
-while True:
-    for t, s, a, b in rx_can.feedback():
-        print(f'time: {t} speed: {s} accel: {a} break: {b}')
+fig, (ax1, ax2, ax3) = plt.subplots(3,1, sharex=True)  # ax1 : vehicle speed ax2 : APS_Feedback(accel) ax3 : Break_ACT_Feedback(break)
+
+xs, y1, y2, y3 = [], [], [], []
+
+ax1.set_ylim([0, 255])
+ax2.set_ylim([0, 3800])
+ax3.set_ylim([0, 35000])
+
+def animate(i, xs, y1, y2, y3):
+    t, v, a, b = next(rx_can.feedback())
+    xs.append(t)
+    y1.append(v)
+    y2.append(a)
+    y3.append(b)
+
+    xs = xs[-1000:]
+    y1 = y1[-1000:]
+    y2 = y2[-1000:]
+    y3 = y3[-1000:]
+
+    ax1.clear()
+    ax1.plot(xs, y1)
+    ax2.clear()
+    ax2.plot(xs, y2)
+    ax3.clear()
+    ax3.plot(xs,y3)
+
+
+
+ani = FuncAnimation(fig, animate, fargs=(xs,y1,y2,y3), interval=20)
+plt.show()
+
+
 
