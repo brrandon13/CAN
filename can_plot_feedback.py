@@ -7,6 +7,7 @@ import datetime as dt
 
 
 CAN_FEEDBACK_NAME = ["APS_Feedback", "Break_ACT_Feedback","Steering_Angle_Feedback","Override_Feedback", "Vehicle_Speed","Turn_Sig_Feed"]
+CAN_CONTROL_NAME = ['Accel_CMD','Break_CMD','Steering_CMD','Gear_Shift_CMD','Override_Off','Alive_Count','Angular_Speed_CMD']
 
 class CAN(object):
     def __init__(self):
@@ -17,32 +18,19 @@ class CAN(object):
             'Vehicle_Info_1')  # APS_Feedback, Break_ACT_Feedback, Steering_Angle_Feedback
         self.vehicle_info_2 = self.db.get_message_by_name(
             'Vehicle_Info_2')  # Override_Feedback, Vehicle_Speed, Turn_Sig_Feed
-        self.Control_CMD = self.db.get_message_by_name('Control_CMD')
-        # Override_Off, Alive_Count, Angular_Speed_CMD
-        self.Driving_CMD = self.db.get_message_by_name('Driving_CMD')
-        # Accel_CMD, Break_CMD, Steering_CMD, Gear_Shift_CMD
 
         self.timestamp = 0
 
-        # Control CMD
-        self.override_off = True
-        self.alive_count = 0
-        self.angular_speed = 50
-
-        # Driving CMD
-        self.Accel_CMD = 0
-        self.Break_CMD = 0
-        self.Steering_CMD = 0
-        self.Gear_Shift_CMD = 6  # N
-
-        self.feedback_info = {"APS_Feedback":0, "Break_ACT_Feedback":0,"Gear_Shift_Feedback":6,
+        self.feedback_info = {"APS_Feedback":0, "Break_ACT_Feedback":0,"Gear_Shift_Feedback":5,
                               "Steering_Angle_Feedback":0,"Override_Feedback":0, "Vehicle_Speed":0,"Turn_Sig_Feed":0}
+
+        self.command_info = {'Accel_CMD':650,'Break_CMD':0,'Steering_CMD':0,'Gear_Shift_CMD':5,
+                             'Override_Off':0,'Alive_Count':1,'Angular_Speed_CMD':30}
 
     def feedback(self):
         msg = 1
-        is_updated = False
         while msg is not None:
-            msg = self.bus.recv(1)
+            msg = self.bus.recv()
             data = self.db.decode_message(msg.arbitration_id, msg.data)
             self.timestamp = msg.timestamp
 
@@ -52,9 +40,15 @@ class CAN(object):
 
             yield self.timestamp, self.feedback_info['Vehicle_Speed'], self.feedback_info['APS_Feedback'], self.feedback_info['Break_ACT_Feedback']
 
-    def recieve_command(self):
-        pass
+    def command(self):
+        cmd = self.calculate_cmd()
 
+
+    def calculate_cmd(self):
+        accel = self.feedback_info['APS_Feedback']
+        brk = self.feedback_info['Break_ACT_Feedback']
+        speed = self.feedback_info['Vehicle_Speed']
+        return 
 
 rx_can = CAN()
 
@@ -62,9 +56,9 @@ fig, (ax1, ax2, ax3) = plt.subplots(3,1, sharex=True)  # ax1 : vehicle speed ax2
 
 xs, y1, y2, y3 = [], [], [], []
 
-ax1.set_ylim([0, 255])
-ax2.set_ylim([0, 3800])
-ax3.set_ylim([0, 35000])
+ax1.ylim([0, 255])
+ax2.ylim([0, 3800])
+ax3.ylim([0, 35000])
 
 def animate(i, xs, y1, y2, y3):
     t, v, a, b = next(rx_can.feedback())

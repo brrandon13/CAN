@@ -370,23 +370,8 @@ class CAN(object):
             'Vehicle_Info_1')  # APS_Feedback, Break_ACT_Feedback, Steering_Angle_Feedback
         self.vehicle_info_2 = self.db.get_message_by_name(
             'Vehicle_Info_2')  # Override_Feedback, Vehicle_Speed, Turn_Sig_Feed
-        self.Control_CMD = self.db.get_message_by_name('Control_CMD')
-        # Override_Off, Alive_Count, Angular_Speed_CMD
-        self.Driving_CMD = self.db.get_message_by_name('Driving_CMD')
-        # Accel_CMD, Break_CMD, Steering_CMD, Gear_Shift_CMD
 
         self.timestamp = 0
-
-        # Control CMD
-        self.override_off = True
-        self.alive_count = 0
-        self.angular_speed = 50
-
-        # Driving CMD
-        self.Accel_CMD = 0
-        self.Break_CMD = 0
-        self.Steering_CMD = 0
-        self.Gear_Shift_CMD = 6  # N
 
         # Vehicle Info 1
         self.APS_Feedback = 0
@@ -640,7 +625,7 @@ def game_loop(args):
             # set the world to synchronous mode
             if not settings.synchronous_mode:
                 settings.synchronous_mode = True
-                settings.fixed_delta_seconds = 0.05
+                settings.fixed_delta_seconds = 0.02 
             sim_world.apply_settings(settings)
 
             traffic_manager = client.get_trafficmanager()
@@ -680,7 +665,7 @@ def game_loop(args):
         while True:  # loop
             if args.sync:
                 sim_world.tick()
-            clock.tick_busy_loop(5)  # client fps: 60 
+            clock.tick_busy_loop(50)  # client fps: 60 
             if controller.parse_events(client, world, clock, args.sync):
                 return
             world.tick(clock)  # WORLD
