@@ -144,7 +144,7 @@ def get_actor_blueprints(world, filter, generation):
 # ==============================================================================
 
 
-class World(object):
+class World(object):  
     def __init__(self, carla_world, hud, args):
         self.world = carla_world
         self.sync = args.sync
@@ -157,13 +157,10 @@ class World(object):
             print('  Make sure it exists, has the same name of your town, and is correct.')
             sys.exit(1)
         self.hud = hud
-        self.player = None
+        self.player = None  # carla.Actor.Vehicle
         self.camera_manager = None
-        self._weather_presets = find_weather_presets()
-        self._weather_index = 0
         self._actor_filter = 'vehicle.tesla.cybertruck'
         self._actor_generation = args.generation
-        self._gamma = args.gamma
         self.restart()
         self.world.on_tick(hud.on_world_tick)  # on_tick(self, callback) function is called every time the server ticks
         self.recording_enabled = False
@@ -187,8 +184,6 @@ class World(object):
         ]
 
     def restart(self):
-        self.player_max_speed = 1.589
-        self.player_max_speed_fast = 3.713
         # Keep same camera config if the camera manager exists.
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
@@ -201,8 +196,6 @@ class World(object):
         if blueprint.has_attribute('driver_id'):
             driver_id = random.choice(blueprint.get_attribute('driver_id').recommended_values)
             blueprint.set_attribute('driver_id', driver_id)
-        if blueprint.has_attribute('is_invincible'):
-            blueprint.set_attribute('is_invincible', 'true')
         # set the max speed
         if blueprint.has_attribute('speed'):
             self.player_max_speed = float(blueprint.get_attribute('speed').recommended_values[1])
@@ -229,7 +222,7 @@ class World(object):
             self.show_vehicle_telemetry = False
             self.modify_vehicle_physics(self.player)
         # Set up the sensors.
-        self.camera_manager = CameraManager(self.player, self.hud, self._gamma)
+        self.camera_manager = CameraManager(self.player, self.hud)
         self.camera_manager.transform_index = cam_pos_index
         self.camera_manager.set_sensor(cam_index, notify=False)
         actor_type = get_actor_display_name(self.player)
@@ -508,7 +501,7 @@ class HUD(object):
 
 
 class CameraManager(object):
-    def __init__(self, parent_actor, hud, gamma_correction):
+    def __init__(self, parent_actor, hud):
         self.sensor = None
         self.surface = None
         self._parent = parent_actor
@@ -524,9 +517,7 @@ class CameraManager(object):
                                 carla.Rotation(pitch=8.0)), Attachment.SpringArm)]
 
         self.transform_index = 1
-        self.sensors = [
-            ['sensor.camera.rgb', cc.Raw, 'Camera RGB', {}]
-        ]
+        self.sensors = [['sensor.camera.rgb', cc.Raw, 'Camera RGB', {}]]
         world = self._parent.get_world()
         bp_library = world.get_blueprint_library()
         for item in self.sensors:
@@ -534,24 +525,11 @@ class CameraManager(object):
             if item[0].startswith('sensor.camera'):
                 bp.set_attribute('image_size_x', str(hud.dim[0]))
                 bp.set_attribute('image_size_y', str(hud.dim[1]))
-                if bp.has_attribute('gamma'):
-                    bp.set_attribute('gamma', str(gamma_correction))
                 for attr_name, attr_value in item[3].items():
                     bp.set_attribute(attr_name, attr_value)
-            elif item[0].startswith('sensor.lidar'):
-                self.lidar_range = 50
-
-                for attr_name, attr_value in item[3].items():
-                    bp.set_attribute(attr_name, attr_value)
-                    if attr_name == 'range':
-                        self.lidar_range = float(attr_value)
 
             item.append(bp)
         self.index = None
-
-    def toggle_camera(self):
-        self.transform_index = (self.transform_index + 1) % len(self._camera_transforms)
-        self.set_sensor(self.index, notify=False, force_respawn=True)
 
     def set_sensor(self, index, notify=True, force_respawn=False):
         index = index % len(self.sensors)
@@ -569,14 +547,8 @@ class CameraManager(object):
             # We need to pass the lambda a weak reference to self to avoid
             # circular reference.
             weak_self = weakref.ref(self)
-            self.sensor.listen(lambda image: CameraManager._parse_image(weak_self, image))
+            self.sensor.listen(lambda image: CameraManager._parse_image(weak_self, image)) # called every time sensor retrieves data
         self.index = index
-
-    def next_sensor(self):
-        self.set_sensor(self.index + 1)
-
-    def toggle_recording(self):
-        self.recording = not self.recording
 
     def render(self, display):
         if self.surface is not None:
@@ -594,9 +566,6 @@ class CameraManager(object):
             array = array[:, :, :3]
             array = array[:, :, ::-1]
             self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
-        if self.recording:
-            image.save_to_disk('_out/%08d' % image.frame)
-
 
 # ==============================================================================
 # -- game_loop() ---------------------------------------------------------------

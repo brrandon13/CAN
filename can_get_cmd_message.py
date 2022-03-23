@@ -6,9 +6,10 @@ import pygame
 from can_package import CAN
 import random
 
+from can_send_cmd_message import CYCLE_FPS
+
 CONTROL_CMD = 1
 DRIVING_CMD = 2
-CYCLE_FPS = 1
 
 
 class Car(CAN):
