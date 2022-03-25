@@ -1,7 +1,7 @@
 import can
 import cantools
 import pygame
-from can_package import CAN
+from agents.navigation.can_package import CAN
 from agents.navigation.basic_agent import BasicAgent
 
 CONTROL_CMD = 1

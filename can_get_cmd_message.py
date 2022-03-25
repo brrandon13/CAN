@@ -3,7 +3,7 @@ from importlib.resources import is_resource
 import can
 import cantools
 import pygame
-from can_package import CAN
+from agents.navigation.can_package import CAN
 import random
 
 from can_send_cmd_message import CYCLE_FPS

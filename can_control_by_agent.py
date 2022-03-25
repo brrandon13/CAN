@@ -18,6 +18,9 @@ import glob
 import os
 import sys
 
+from pygame import K_q
+from pygame import KMOD_CTRL
+
 try:
     sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
@@ -49,45 +52,8 @@ import cantools
 
 try:
     import pygame
-    from pygame.locals import KMOD_CTRL
-    from pygame.locals import KMOD_SHIFT
-    from pygame.locals import K_0
-    from pygame.locals import K_9
-    from pygame.locals import K_BACKQUOTE
-    from pygame.locals import K_BACKSPACE
-    from pygame.locals import K_COMMA
     from pygame.locals import K_DOWN
     from pygame.locals import K_ESCAPE
-    from pygame.locals import K_F1
-    from pygame.locals import K_LEFT
-    from pygame.locals import K_PERIOD
-    from pygame.locals import K_RIGHT
-    from pygame.locals import K_SLASH
-    from pygame.locals import K_SPACE
-    from pygame.locals import K_TAB
-    from pygame.locals import K_UP
-    from pygame.locals import K_a
-    from pygame.locals import K_b
-    from pygame.locals import K_c
-    from pygame.locals import K_d
-    from pygame.locals import K_g
-    from pygame.locals import K_h
-    from pygame.locals import K_i
-    from pygame.locals import K_l
-    from pygame.locals import K_m
-    from pygame.locals import K_n
-    from pygame.locals import K_o
-    from pygame.locals import K_p
-    from pygame.locals import K_q
-    from pygame.locals import K_r
-    from pygame.locals import K_s
-    from pygame.locals import K_t
-    from pygame.locals import K_v
-    from pygame.locals import K_w
-    from pygame.locals import K_x
-    from pygame.locals import K_z
-    from pygame.locals import K_MINUS
-    from pygame.locals import K_EQUALS
 except ImportError:
     raise RuntimeError('cannot import pygame, make sure pygame package is installed')
 
@@ -95,6 +61,8 @@ try:
     import numpy as np
 except ImportError:
     raise RuntimeError('cannot import numpy, make sure numpy package is installed')
+
+from agents.navigation.can_package import CAN
 
 
 # ==============================================================================
@@ -168,38 +136,15 @@ class World(object):
         self.constant_velocity_enabled = False
         self.show_vehicle_telemetry = False
         self.doors_are_open = False
-        self.current_map_layer = 0
-        self.map_layer_names = [
-            carla.MapLayer.NONE,
-            carla.MapLayer.Buildings,
-            carla.MapLayer.Decals,
-            carla.MapLayer.Foliage,
-            carla.MapLayer.Ground,
-            carla.MapLayer.ParkedVehicles,
-            carla.MapLayer.Particles,
-            carla.MapLayer.Props,
-            carla.MapLayer.StreetLights,
-            carla.MapLayer.Walls,
-            carla.MapLayer.All
-        ]
 
     def restart(self):
         # Keep same camera config if the camera manager exists.
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
         # Get a random blueprint.
-        blueprint = random.choice(get_actor_blueprints(self.world, self._actor_filter, self._actor_generation))
+        blueprint_library = self.world.get_blueprint_library()
+        blueprint = blueprint_library.find(self._actor_filter)
         blueprint.set_attribute('role_name', self.actor_role_name)
-        if blueprint.has_attribute('color'):
-            color = random.choice(blueprint.get_attribute('color').recommended_values)
-            blueprint.set_attribute('color', color)
-        if blueprint.has_attribute('driver_id'):
-            driver_id = random.choice(blueprint.get_attribute('driver_id').recommended_values)
-            blueprint.set_attribute('driver_id', driver_id)
-        # set the max speed
-        if blueprint.has_attribute('speed'):
-            self.player_max_speed = float(blueprint.get_attribute('speed').recommended_values[1])
-            self.player_max_speed_fast = float(blueprint.get_attribute('speed').recommended_values[2])
 
         # Spawn the player.
         if self.player is not None:
@@ -254,12 +199,10 @@ class World(object):
         self.camera_manager.index = None
 
     def destroy(self):
-        sensors = [
-            self.camera_manager.sensor]
-        for sensor in sensors:
-            if sensor is not None:
-                sensor.stop()
-                sensor.destroy()
+        sensor = self.camera_manager.sensor
+        if sensor is not None:
+            sensor.stop()
+            sensor.destroy()
         if self.player is not None:
             self.player.destroy()
 
@@ -270,140 +213,24 @@ class World(object):
 
 
 class KeyboardControl(object):
-    """Class that handles keyboard input."""
 
-    def __init__(self, world, start_in_autopilot):
-        self._autopilot_enabled = start_in_autopilot
-        if isinstance(world.player, carla.Vehicle):
-            self._control = carla.VehicleControl()
-            self._lights = carla.VehicleLightState.NONE
-            world.player.set_autopilot(self._autopilot_enabled)
-            world.player.set_light_state(self._lights)
-        else:
-            raise NotImplementedError("Actor type not supported")
-        self._steer_cache = 0.0
-
-    def parse_events(self, client, world, clock, sync_mode):
-        global current_lights
-        if isinstance(self._control, carla.VehicleControl):
-            current_lights = self._lights
+    def parse_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
-            elif event.type == pygame.KEYUP:
+            if event.type == pygame.KEYUP:
                 if self._is_quit_shortcut(event.key):
                     return True
-                elif event.key == K_q:
-                    self._control.gear = 1 if self._control.reverse else -1
-        if not self._autopilot_enabled:
-            self._parse_vehicle_keys(pygame.key.get_pressed(), clock.get_time())
-            self._control.reverse = self._control.gear < 0
-            # Set automatic control-related vehicle lights
-            if self._control.brake:
-                current_lights |= carla.VehicleLightState.Brake
-            else:  # Remove the Brake flag
-                current_lights &= ~carla.VehicleLightState.Brake
-            if self._control.reverse:
-                current_lights |= carla.VehicleLightState.Reverse
-            else:  # Remove the Reverse flag
-                current_lights &= ~carla.VehicleLightState.Reverse
-            if current_lights != self._lights:  # Change the light state only if necessary
-                self._lights = current_lights
-                world.player.set_light_state(carla.VehicleLightState(self._lights))
-            world.player.apply_control(self._control)
-
-    def _parse_vehicle_keys(self, keys, milliseconds):
-        if keys[K_UP] or keys[K_w]:
-            self._control.throttle = min(self._control.throttle + 0.01, 1.00)
-        else:
-            self._control.throttle = 0.0
-
-        if keys[K_DOWN] or keys[K_s]:
-            self._control.brake = min(self._control.brake + 0.2, 1)
-        else:
-            self._control.brake = 0
-
-        steer_increment = 5e-4 * milliseconds
-        if keys[K_LEFT] or keys[K_a]:
-            if self._steer_cache > 0:
-                self._steer_cache = 0
-            else:
-                self._steer_cache -= steer_increment
-        elif keys[K_RIGHT] or keys[K_d]:
-            if self._steer_cache < 0:
-                self._steer_cache = 0
-            else:
-                self._steer_cache += steer_increment
-        else:
-            self._steer_cache = 0.0
-        self._steer_cache = min(0.7, max(-0.7, self._steer_cache))
-        self._control.steer = round(self._steer_cache, 1)
-        self._control.hand_brake = keys[K_SPACE]
 
     @staticmethod
     def _is_quit_shortcut(key):
+        """Shortcut for quitting"""
         return (key == K_ESCAPE) or (key == K_q and pygame.key.get_mods() & KMOD_CTRL)
 
 
 # ==============================================================================
-# -- CAN -----------------------------------------------------------------------
+# -- HUD -----------------------------------------------------------------------
 # ==============================================================================
-
-
-class CAN(object):
-    def __init__(self):
-        # CAN
-        self.db = cantools.database.load_file('SantaFe.dbc')
-        self.bus = can.interface.Bus(bustype='socketcan', channel='vcan0', bitrate=500000)
-        self.vehicle_info_1 = self.db.get_message_by_name(
-            'Vehicle_Info_1')  # APS_Feedback, Break_ACT_Feedback, Steering_Angle_Feedback
-        self.vehicle_info_2 = self.db.get_message_by_name(
-            'Vehicle_Info_2')  # Override_Feedback, Vehicle_Speed, Turn_Sig_Feed
-
-        self.timestamp = 0
-
-        # Vehicle Info 1
-        self.APS_Feedback = 0
-        self.Break_ACT_Feedback = 0
-        self.Gear_Shift_Feedback = 6
-        self.Steering_Angle_Feedback = 0
-
-        # Vehicle Info 2
-        self.Override_Feedback = 0
-        self.Vehicle_Speed = 0
-        self.Turn_Sig_Feed = 0
-
-    def send_feedback(self, world):
-        v = world.player.get_velocity()
-        c = world.player.get_control()
-        if c.reverse:
-            self.Gear_Shift_Feedback = 7
-        elif c.gear == 0:
-            self.Gear_Shift_Feedback = 6
-        else:
-            self.Gear_Shift_Feedback = 5
-
-        self.Vehicle_Speed = min(round(3.6 * math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2)), 255)
-        self.Steering_Angle_Feedback = round(c.steer * 520)
-        self.APS_Feedback = round(c.throttle * 3800)
-        self.Break_ACT_Feedback = round(c.brake * 35000)  # 0 ~ 17000 => 0 ~ 35000
-
-        data = self.vehicle_info_1.encode({"APS_Feedback": self.APS_Feedback,
-                                           "Break_ACT_Feedback": self.Break_ACT_Feedback,
-                                           "Gear_Shift_Feedback": self.Gear_Shift_Feedback,
-                                           "Steering_Angle_Feedback": self.Steering_Angle_Feedback,
-                                           "Switch_State": 0})
-        message = can.Message(arbitration_id=self.vehicle_info_1.frame_id, data=data, is_extended_id=False)
-        self.bus.send(message)
-        # print(f'message send {self.APS_Feedback} {self.Break_ACT_Feedback}')
-
-        data = self.vehicle_info_2.encode({"Override_Feedback": self.Override_Feedback,
-                                           "Vehicle_Speed": self.Vehicle_Speed,
-                                           "Turn_Sig_Feed": self.Turn_Sig_Feed,
-                                           "APS_Feed": 0,
-                                           "BPS_Feed": 0})
-        message = can.Message(arbitration_id=self.vehicle_info_2.frame_id, data=data, is_extended_id=False)
-        self.bus.send(message)
 
 # ==============================================================================
 # -- HUD -----------------------------------------------------------------------
@@ -427,7 +254,6 @@ class HUD(object):
         self._info_text = []
         self._server_clock = pygame.time.Clock()
 
-        self.can = CAN()
 
     def on_world_tick(self, timestamp):  # timestamp?
         self._server_clock.tick(120)
@@ -442,7 +268,6 @@ class HUD(object):
         v = world.player.get_velocity()
         c = world.player.get_control()
 
-        self.can.send_feedback(world)
         self._info_text = [
             'Server:  % 16.0f FPS' % self.server_fps,
             'Client:  % 16.0f FPS' % clock.get_fps()]
@@ -488,7 +313,6 @@ class HUD(object):
                     surface = self._font_mono.render(item, True, (255, 255, 255))
                     display.blit(surface, (8, v_offset))
                 v_offset += 18
-
 
 
 # ==============================================================================
@@ -545,6 +369,7 @@ class CameraManager(object):
             weak_self = weakref.ref(self)
             self.sensor.listen(lambda image: CameraManager._parse_image(weak_self, image)) # called every time sensor retrieves data
         self.index = index
+
 
     def render(self, display):
         if self.surface is not None:
@@ -614,41 +439,44 @@ def game_loop(args):
 
         hud = HUD(args.width, args.height)  # HUD
         world = World(sim_world, hud, args)  # WORLD
-        controller = KeyboardControl(world, args.autopilot)  # CONTROL
+        controller = KeyboardControl()  # CONTROL
 
-        if args.sync:
-            sim_world.tick()  # synchronous mode
-        else:
-            sim_world.wait_for_tick()
-        """
-        tick(self, seconds=10.0):
-        This method is used in synchronous mode, when the server waits for a client tick before computing the next frame
-        This method will send the tick, and give way to the server. 
-        It returns the ID of the new frame computed by the server. 
-        """
+        agent = CAN(world.player)
+
+        # Set the agent destination
+        spawn_points = world.map.get_spawn_points()
+        destination = random.choice(spawn_points).location
+        agent.set_destination(destination)
+
         clock = pygame.time.Clock()
-        while True:  # loop
-            if args.sync:
-                sim_world.tick()
-            clock.tick_busy_loop(50)  # client fps: 60 
-            if controller.parse_events(client, world, clock, args.sync):
-                return
-            world.tick(clock)  # WORLD
-            """
-            in def restart():
-            ...
-                if self.sync:
-                    self.world.tick()
-                else:
-                    self.world.wait_for_tick()
-            """
 
-            """
-            def tick(self, clock)
-                self.hud.tick(clock)
-            """
+        while True:
+            clock.tick()
+            if args.sync:
+                world.world.tick()
+            else:
+                world.world.wait_for_tick()
+            if controller.parse_events():
+                return
+
+            world.tick(clock)
             world.render(display)
             pygame.display.flip()
+
+            if agent.done():
+                if args.loop:
+                    agent.set_destination(random.choice(spawn_points).location)
+                    world.hud.notification("The target has been reached, searching for another target", seconds=4.0)
+                    print("The target has been reached, searching for another target")
+                else:
+                    print("The target has been reached, stopping the simulation")
+                    break
+            
+            agent._send_command()
+            agent._get_control()
+            control = agent.run()
+            world.player.apply_control(control)
+
 
     finally:
 
@@ -695,7 +523,7 @@ def main():
     argparser.add_argument(
         '--res',
         metavar='WIDTHxHEIGHT',
-        default='1280x720',
+        default='960x540',
         help='window resolution (default: 1280x720)')
     argparser.add_argument(
         '--filter',

@@ -4,7 +4,6 @@ import carla
 import math
 from agents.navigation.basic_agent import BasicAgent
 
-
 CONTROL_CMD = 1
 DRIVING_CMD = 2
 
@@ -79,11 +78,11 @@ class CAN(BasicAgent):
             return 0
 
     def _send_command(self):
+        # print("_send_command")
         self.control_cmd_info['Alive_Count'] += 1
         self.control_cmd_info['Alive_Count'] %= 256
 
         control = self.run_step()  # calculate from pid control
-
         accel_cmd = int(self._scaler(control.throttle, 0, 1, 650, 3400))
         break_cmd = int(self._scaler(control.brake, 0, 1, 0, 17000))
         steer_cmd = int(self._scaler(control.steer, -1, 1, -520, 520))
@@ -91,13 +90,14 @@ class CAN(BasicAgent):
         self.driving_cmd_info["Accel_CMD"] = accel_cmd
         self.driving_cmd_info["Break_CMD"] = break_cmd
         self.driving_cmd_info["Steering_CMD"] = steer_cmd
-
+        #print(self.driving_cmd_info)
         data = self.Control_CMD.encode(self.control_cmd_info)
         message = can.Message(arbitration_id=self.Control_CMD.frame_id, data=data,is_extended_id=False)
         self.bus.send(message)
         data = self.Driving_CMD.encode(self.driving_cmd_info)
         message = can.Message(arbitration_id=self.Driving_CMD.frame_id, data=data,is_extended_id=False)
         self.bus.send(message)
+        # print("command sent")
     
     @staticmethod
     def _scaler(old_value, old_min, old_max, new_min, new_max):
@@ -105,14 +105,10 @@ class CAN(BasicAgent):
     
 
     def run(self):
-        self._send_feedback()
-        if self._get_feedback():  #  communication established
-            self._send_command()  #  calculate control and send to CAN bus
+        control = carla.VehicleControl()
+        control.steer = self._scaler(self.driving_cmd_info["Steering_CMD"],-520,520,-1,1)
+        control.throttle = self._scaler(self.driving_cmd_info["Accel_CMD"],650,3400,0,1)
+        control.brake = self._scaler(self.driving_cmd_info["Break_CMD"],0,17000,0,1)
 
-            if self._get_control() == DRIVING_CMD:
-                control = carla.VehicleControl()
-                control.steer = self._scaler(self.driving_cmd_info["Steering_CMD"],-520,520,-1,1)
-                control.throttle = self._scaler(self.driving_cmd_info["Accel_CMD"],650,3400,0,1)
-                control.brake = self._scaler(self.driving_cmd_info["Break_CMD"],0,17000,0,1)
-                self._vehicle.apply_control()
+        return control
     
