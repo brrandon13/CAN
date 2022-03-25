@@ -72,7 +72,7 @@ class VehiclePIDController():
             control.throttle = 0.0
             control.brake = min(abs(acceleration), self.max_brake)
 
-        # Steering regulation: changes cannot happen abruptly, can't steer too much.
+        # Angular Speed
 
         if current_steering > self.past_steering + 0.1:
             current_steering = self.past_steering + 0.1

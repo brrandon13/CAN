@@ -64,49 +64,6 @@ except ImportError:
 
 from agents.navigation.can_package import CAN
 
-
-# ==============================================================================
-# -- Global functions ----------------------------------------------------------
-# ==============================================================================
-
-
-def find_weather_presets():
-    rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
-    name = lambda x: ' '.join(m.group(0) for m in rgx.finditer(x))
-    presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]
-    return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
-
-
-def get_actor_display_name(actor, truncate=250):
-    name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
-    return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
-
-
-def get_actor_blueprints(world, filter, generation):
-    bps = world.get_blueprint_library().filter(filter)
-
-    if generation.lower() == "all":
-        return bps
-
-    # If the filter returns only one bp, we assume that this one needed
-    # and therefore, we ignore the generation
-    if len(bps) == 1:
-        return bps
-
-    try:
-        int_generation = int(generation)
-        # Check if generation is in available generations
-        if int_generation in [1, 2]:
-            bps = [x for x in bps if int(x.get_attribute('generation')) == int_generation]
-            return bps
-        else:
-            print("   Warning! Actor Generation is not valid. No actor will be spawned.")
-            return []
-    except:
-        print("   Warning! Actor Generation is not valid. No actor will be spawned.")
-        return []
-
-
 # ==============================================================================
 # -- World ---------------------------------------------------------------------
 # ==============================================================================
@@ -163,14 +120,17 @@ class World(object):
                 sys.exit(1)
             spawn_points = self.map.get_spawn_points()
             spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
+
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
+            # get vehicle id to attach sensors
+            print(f'self.player.id :{self.player.id}')
+            
             self.show_vehicle_telemetry = False
             self.modify_vehicle_physics(self.player)
         # Set up the sensors.
         self.camera_manager = CameraManager(self.player, self.hud)
         self.camera_manager.transform_index = cam_pos_index
         self.camera_manager.set_sensor(cam_index, notify=False)
-        actor_type = get_actor_display_name(self.player)
 
         if self.sync:
             self.world.tick()
@@ -476,7 +436,8 @@ def game_loop(args):
             agent._get_control()
             control = agent.run()
             world.player.apply_control(control)
-
+            agent._send_feedback()
+            
 
     finally:
 

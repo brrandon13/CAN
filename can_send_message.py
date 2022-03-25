@@ -578,7 +578,7 @@ def game_loop(args):
         client = carla.Client(args.host, args.port)
         client.set_timeout(20.0)
 
-        sim_world = client.get_world()  # CLIENT
+        sim_world = client.get_world()  
         # get_world(self):
         # Returns the world object currently active in the simulation.
         # This world will be later used for example to load maps.
