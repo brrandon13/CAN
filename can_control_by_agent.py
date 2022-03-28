@@ -20,6 +20,7 @@ import sys
 
 from pygame import K_q
 from pygame import KMOD_CTRL
+from pygame import K_BACKSPACE
 
 try:
     sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
@@ -47,8 +48,8 @@ import random
 import re
 import weakref
 
-import can
-import cantools
+from threading import Thread
+import socket
 
 try:
     import pygame
@@ -86,13 +87,29 @@ class World(object):
         self.camera_manager = None
         self._actor_filter = 'vehicle.tesla.cybertruck'
         self._actor_generation = args.generation
+
         self.restart()
+        self.socket_init()
+
         self.world.on_tick(hud.on_world_tick)  # on_tick(self, callback) function is called every time the server ticks
         self.recording_enabled = False
         self.recording_start = 0
         self.constant_velocity_enabled = False
         self.show_vehicle_telemetry = False
         self.doors_are_open = False
+    
+    def socket_init(self):
+        s = socket.socket()
+        s.bind(('localhost',8000))
+        s.listen(5)
+        while True:
+            c, addr = s.accept()
+            print('Got connection from', addr)
+            c.send(str(self.player.id).encode("utf-8"))
+            c.close()
+            break
+        s.close()
+        print('socket closed')
 
     def restart(self):
         # Keep same camera config if the camera manager exists.
@@ -174,7 +191,7 @@ class World(object):
 
 class KeyboardControl(object):
 
-    def parse_events(self):
+    def parse_events(self, world):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
@@ -186,11 +203,6 @@ class KeyboardControl(object):
     def _is_quit_shortcut(key):
         """Shortcut for quitting"""
         return (key == K_ESCAPE) or (key == K_q and pygame.key.get_mods() & KMOD_CTRL)
-
-
-# ==============================================================================
-# -- HUD -----------------------------------------------------------------------
-# ==============================================================================
 
 # ==============================================================================
 # -- HUD -----------------------------------------------------------------------
@@ -375,7 +387,7 @@ def game_loop(args):
             # set the world to synchronous mode
             if not settings.synchronous_mode:
                 settings.synchronous_mode = True
-                settings.fixed_delta_seconds = 0.02 
+                settings.fixed_delta_seconds = 0.03
             sim_world.apply_settings(settings)
 
             traffic_manager = client.get_trafficmanager()
@@ -403,11 +415,7 @@ def game_loop(args):
 
         agent = CAN(world.player)
 
-        # Set the agent destination
-        spawn_points = world.map.get_spawn_points()
-        destination = random.choice(spawn_points).location
-        agent.set_destination(destination)
-
+        
         clock = pygame.time.Clock()
 
         while True:
@@ -416,38 +424,38 @@ def game_loop(args):
                 world.world.tick()
             else:
                 world.world.wait_for_tick()
-            if controller.parse_events():
+            if controller.parse_events(world):
+                agent._send_emergency_stop()
                 return
 
             world.tick(clock)
             world.render(display)
             pygame.display.flip()
 
-            if agent.done():
-                if args.loop:
-                    agent.set_destination(random.choice(spawn_points).location)
-                    world.hud.notification("The target has been reached, searching for another target", seconds=4.0)
-                    print("The target has been reached, searching for another target")
-                else:
-                    print("The target has been reached, stopping the simulation")
-                    break
-            
-            agent._send_command()
-            agent._get_control()
+            th1 = Thread(target=agent._send_feedback)
+            th2 = Thread(target=agent._get_control_cmd)
+            th3 = Thread(target=agent._get_driving_cmd)
+
+            th1.start()
+            th2.start()
+            th3.start()
+            th1.join()
+            th2.join()
+            th3.join()
+
             control = agent.run()
+
             world.player.apply_control(control)
-            agent._send_feedback()
-            
+            # print(world.player.get_location())
 
     finally:
 
         if original_settings:
             sim_world.apply_settings(original_settings)
 
-        if (world and world.recording_enabled):
-            client.stop_recorder()
 
         if world is not None:
+            print('destroying the world: sensors & players')
             world.destroy()
 
         pygame.quit()

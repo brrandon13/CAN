@@ -4,6 +4,8 @@ import carla
 import math
 from agents.navigation.basic_agent import BasicAgent
 
+from threading import Thread
+
 CONTROL_CMD = 1
 DRIVING_CMD = 2
 
@@ -32,13 +34,20 @@ class CAN(BasicAgent):
 
         BasicAgent.__init__(self,vehicle)
     
-    def _get_control(self):
+    def _get_control_cmd(self):
         try:
-            msg = self.bus.recv(0.5)  # wait 0.5 sec to get msg then raise error
+            msg = self.bus.recv(0.1)  # wait 0.5 sec to get msg then raise error
             data = self.db.decode_message(msg.arbitration_id, msg.data)
             if msg.arbitration_id == self.Control_CMD.frame_id:
                 self.control_cmd_info = data
                 return CONTROL_CMD
+        except:
+            return 0
+    
+    def _get_driving_cmd(self):
+        try:
+            msg = self.bus.recv(0.1)  # wait 0.5 sec to get msg then raise error
+            data = self.db.decode_message(msg.arbitration_id, msg.data)
             if msg.arbitration_id == self.Driving_CMD.frame_id:
                 self.driving_cmd_info = data
                 return DRIVING_CMD
@@ -56,9 +65,19 @@ class CAN(BasicAgent):
         elif c.gear == 0: self.vehicle_info_1["Gear_Shift_Feedback"] = 6
         else: self.vehicle_info_1["Gear_Shift_Feedback"] = 5
 
+        if self.control_cmd_info["Override_Off"] == 0:  # override on
+            self.vehicle_info_2["Override_Feedback"] = 0
+
+
         data = self.Vehicle_Info_1.encode(self.vehicle_info_1)
         message = can.Message(arbitration_id=self.Vehicle_Info_1.frame_id, data=data,is_extended_id=False)
         self.bus.send(message)
+        data = self.Vehicle_Info_2.encode(self.vehicle_info_2)
+        message = can.Message(arbitration_id=self.Vehicle_Info_2.frame_id, data=data, is_extended_id=False)
+        self.bus.send(message)
+    
+    def _send_emergency_stop(self):
+        self.vehicle_info_2["Override_Feedback"] = 1
         data = self.Vehicle_Info_2.encode(self.vehicle_info_2)
         message = can.Message(arbitration_id=self.Vehicle_Info_2.frame_id, data=data, is_extended_id=False)
         self.bus.send(message)
@@ -73,31 +92,34 @@ class CAN(BasicAgent):
                 return VEHICLE_INFO_1
             if msg.arbitration_id == self.Vehicle_Info_2.frame_id:
                 self.vehicle_info_2 = data
+                if self.vehicle_info_2["Override_Feedback"] != 0:
+                    return 0
                 return VEHICLE_INFO_2
         except:
             return 0
 
-    def _send_command(self):
+    def _send_control_cmd(self):
         # print("_send_command")
         self.control_cmd_info['Alive_Count'] += 1
         self.control_cmd_info['Alive_Count'] %= 256
-
-        control = self.run_step()  # calculate from pid control
-        accel_cmd = int(self._scaler(control.throttle, 0, 1, 650, 3400))
-        break_cmd = int(self._scaler(control.brake, 0, 1, 0, 17000))
-        steer_cmd = int(self._scaler(control.steer, -1, 1, -520, 520))
-
-        self.driving_cmd_info["Accel_CMD"] = accel_cmd
-        self.driving_cmd_info["Break_CMD"] = break_cmd
-        self.driving_cmd_info["Steering_CMD"] = steer_cmd
         #print(self.driving_cmd_info)
         data = self.Control_CMD.encode(self.control_cmd_info)
         message = can.Message(arbitration_id=self.Control_CMD.frame_id, data=data,is_extended_id=False)
         self.bus.send(message)
+    
+    def _send_driving_cmd(self):
+        control = self.run_step()  # calculate from pid control
+        accel_cmd = int(self._scaler(control.throttle, 0, 1, 650, 3400))
+        break_cmd = int(self._scaler(control.brake, 0, 1, 0, 17000))
+        steer_cmd = int(control.steer * 520)
+
+        self.driving_cmd_info["Accel_CMD"] = accel_cmd
+        self.driving_cmd_info["Break_CMD"] = break_cmd
+        self.driving_cmd_info["Steering_CMD"] = steer_cmd
+
         data = self.Driving_CMD.encode(self.driving_cmd_info)
         message = can.Message(arbitration_id=self.Driving_CMD.frame_id, data=data,is_extended_id=False)
         self.bus.send(message)
-        # print("command sent")
     
     @staticmethod
     def _scaler(old_value, old_min, old_max, new_min, new_max):
@@ -106,7 +128,7 @@ class CAN(BasicAgent):
 
     def run(self):
         control = carla.VehicleControl()
-        control.steer = self._scaler(self.driving_cmd_info["Steering_CMD"],-520,520,-1,1)
+        control.steer = self.driving_cmd_info["Steering_CMD"] / 520
         control.throttle = self._scaler(self.driving_cmd_info["Accel_CMD"],650,3400,0,1)
         control.brake = self._scaler(self.driving_cmd_info["Break_CMD"],0,17000,0,1)
 

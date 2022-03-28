@@ -26,7 +26,7 @@ class BasicAgent(object):
     as well as to change its parameters in case a different driving mode is desired.
     """
 
-    def __init__(self, vehicle, target_speed=20, opt_dict={}):
+    def __init__(self, vehicle, target_speed=30, opt_dict={}):
         """
         Initialization the agent paramters, the local and the global planner.
 
@@ -48,7 +48,7 @@ class BasicAgent(object):
         self._sampling_resolution = 2.0
         self._base_tlight_threshold = 5.0  # meters
         self._base_vehicle_threshold = 5.0  # meters
-        self._max_brake = 0.5
+        self._max_brake = 0.9
 
         # Change parameters according to the dictionary
         opt_dict['target_speed'] = target_speed
