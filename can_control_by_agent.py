@@ -88,6 +88,8 @@ class World(object):
         self._actor_filter = 'vehicle.tesla.cybertruck'
         self._actor_generation = args.generation
 
+        self.s = socket.socket()
+
         self.restart()
         self.socket_init()
 
@@ -99,17 +101,19 @@ class World(object):
         self.doors_are_open = False
     
     def socket_init(self):
-        s = socket.socket()
-        s.bind(('localhost',8000))
-        s.listen(5)
+        self.s.bind(('localhost',8000))
+        self.s.listen(5)
         while True:
-            c, addr = s.accept()
+            c, addr = self.s.accept()
             print('Got connection from', addr)
             c.send(str(self.player.id).encode("utf-8"))
             c.close()
             break
-        s.close()
+        self.s.close()
         print('socket closed')
+    
+    def close_socket(self):
+        self.s.close()
 
     def restart(self):
         # Keep same camera config if the camera manager exists.
@@ -139,8 +143,6 @@ class World(object):
             spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
 
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
-            # get vehicle id to attach sensors
-            print(f'self.player.id :{self.player.id}')
             
             self.show_vehicle_telemetry = False
             self.modify_vehicle_physics(self.player)
@@ -432,23 +434,27 @@ def game_loop(args):
             world.render(display)
             pygame.display.flip()
 
-            th1 = Thread(target=agent._send_feedback)
-            th2 = Thread(target=agent._get_control_cmd)
-            th3 = Thread(target=agent._get_driving_cmd)
+            th1 = Thread(target=agent._send_vehicle_info_1)
+            th2 = Thread(target=agent._send_vehicle_info_2)
+            th3 = Thread(target=agent._get_control_cmd)
+            th4 = Thread(target=agent._get_driving_cmd)
 
             th1.start()
             th2.start()
             th3.start()
+            th4.start()
             th1.join()
             th2.join()
             th3.join()
+            th4.join() 
 
             control = agent.run()
 
             world.player.apply_control(control)
-            # print(world.player.get_location())
 
     finally:
+        print("Exiting simulation..")
+        
 
         if original_settings:
             sim_world.apply_settings(original_settings)
@@ -456,7 +462,7 @@ def game_loop(args):
 
         if world is not None:
             print('destroying the world: sensors & players')
-            world.destroy()
+            
 
         pygame.quit()
 

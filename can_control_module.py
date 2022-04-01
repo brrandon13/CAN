@@ -112,9 +112,6 @@ def game_loop(args):
     world = None
     original_settings = None
 
-    socket_port = 6000
-
-
     try:
         client = carla.Client(args.host, args.port)
         client.set_timeout(20.0)
@@ -162,22 +159,25 @@ def game_loop(args):
 
             th1 = Thread(target=agent._send_control_cmd)
             th2 = Thread(target=agent._send_driving_cmd)
-            th3 = Thread(target=agent._get_feedback)
+            th3 = Thread(target=agent._get_vehicle_info_1)
+            th4 = Thread(target=agent._get_vehicle_info_2)
+
             
             th1.start()
             th2.start()
             th3.start()
+            th4.start()
+            
             th1.join()
             th2.join()
             th3.join() 
-
-
+            th4.join()
 
     finally:
-
+        print("Exiting simulation..")
         if original_settings:
             sim_world.apply_settings(original_settings)
-
+        
         pygame.quit()
 
 

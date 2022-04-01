@@ -3,6 +3,7 @@ import can
 import carla
 import math
 from agents.navigation.basic_agent import BasicAgent
+from agents.tools.misc import get_speed, is_within_distance, get_trafficlight_trigger_location, compute_distance
 
 from threading import Thread
 
@@ -13,6 +14,7 @@ VEHICLE_INFO_1 = 3
 VEHICLE_INFO_2 = 4
 
 CYCLE_FPS = 50
+
 
 class CAN(BasicAgent):
     def __init__(self, vehicle):
@@ -53,25 +55,27 @@ class CAN(BasicAgent):
                 return DRIVING_CMD
         except:
             return 0
-    
-    def _send_feedback(self):
-        v = self._vehicle.get_velocity()
+
+    def _send_vehicle_info_1(self):
         c = self._vehicle.get_control()
+
         self.vehicle_info_1["APS_Feedback"] = round(c.throttle * 3800)
         self.vehicle_info_1["Break_ACT_Feedback"] = round(c.brake * 35000)
-        self.vehicle_info_2["Vehicle_Speed"] = min(round(3.6 * math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2)), 255)
+        self.vehicle_info_1["Steering_Angle_Feedback"] = round(c.steer * 520)
 
         if c.reverse: self.vehicle_info_1["Gear_Shift_Feedback"] = 7
         elif c.gear == 0: self.vehicle_info_1["Gear_Shift_Feedback"] = 6
         else: self.vehicle_info_1["Gear_Shift_Feedback"] = 5
 
-        if self.control_cmd_info["Override_Off"] == 0:  # override on
-            self.vehicle_info_2["Override_Feedback"] = 0
-
-
         data = self.Vehicle_Info_1.encode(self.vehicle_info_1)
         message = can.Message(arbitration_id=self.Vehicle_Info_1.frame_id, data=data,is_extended_id=False)
         self.bus.send(message)
+    
+    def _send_vehicle_info_2(self):
+        self.vehicle_info_2["Vehicle_Speed"] = min(round(get_speed(self._vehicle)),255)
+        if self.control_cmd_info["Override_Off"] == 0:  # override on
+            self.vehicle_info_2["Override_Feedback"] = 0
+
         data = self.Vehicle_Info_2.encode(self.vehicle_info_2)
         message = can.Message(arbitration_id=self.Vehicle_Info_2.frame_id, data=data, is_extended_id=False)
         self.bus.send(message)
@@ -83,18 +87,23 @@ class CAN(BasicAgent):
         self.bus.send(message)
 
     
-    def _get_feedback(self):
+    def _get_vehicle_info_1(self):
         try:
-            msg = self.bus.recv(0.5)  # wait 0.5 sec to get msg then raise error
+            msg = self.bus.recv(0.1)  # wait 0.5 sec to get msg then raise error
             data = self.db.decode_message(msg.arbitration_id, msg.data)
             if msg.arbitration_id == self.Vehicle_Info_1.frame_id:
                 self.vehicle_info_1 = data
-                return VEHICLE_INFO_1
+        except:
+            return 0
+
+    def _get_vehicle_info_2(self):
+        try:
+            msg = self.bus.recv(0.1)  # wait 0.5 sec to get msg then raise error
+            data = self.db.decode_message(msg.arbitration_id, msg.data)
             if msg.arbitration_id == self.Vehicle_Info_2.frame_id:
                 self.vehicle_info_2 = data
                 if self.vehicle_info_2["Override_Feedback"] != 0:
                     return 0
-                return VEHICLE_INFO_2
         except:
             return 0
 
@@ -124,7 +133,6 @@ class CAN(BasicAgent):
     @staticmethod
     def _scaler(old_value, old_min, old_max, new_min, new_max):
         return ((old_value - old_min) / (old_max - old_min) ) * (new_max - new_min) + new_min
-    
 
     def run(self):
         control = carla.VehicleControl()
