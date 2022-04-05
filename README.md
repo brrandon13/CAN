@@ -19,6 +19,9 @@ CAN control in CARLA simulation
 sudo ./vcan.sh
 ```
 
+in carla-simulator folder
+
+
 2. activate carla server
 
 in command:
@@ -34,10 +37,30 @@ cd /opt/carla-simulator/PythonAPI/util
 python3 config.py --no-rendering
 ```
 
-3. creating traffic(in CAN folder)
+
+in CAN folder
+
+
+3. creating traffic
 
 ```bash
 python3 generate_traffic.py
 ```
 
-4. 
+4. execute 
+
+```bash
+python3 can_control_by_agent.py
+```
+
+in other terminal:
+
+```bash
+python3 can_control_module.py
+```
+
+5. to look for the CAN data:
+
+```bash
+candump vcan0 | cantools decode SantaFe.dbc
+
