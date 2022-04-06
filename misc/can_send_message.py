@@ -630,23 +630,10 @@ def game_loop(args):
         while True:  # loop
             if args.sync:
                 sim_world.tick()
-            clock.tick_busy_loop(50)  # client fps: 60 
+            clock.tick_busy_loop(30)  # client fps: 60 
             if controller.parse_events(client, world, clock, args.sync):
                 return
             world.tick(clock)  # WORLD
-            """
-            in def restart():
-            ...
-                if self.sync:
-                    self.world.tick()
-                else:
-                    self.world.wait_for_tick()
-            """
-
-            """
-            def tick(self, clock)
-                self.hud.tick(clock)
-            """
             world.render(display)
             pygame.display.flip()
 
