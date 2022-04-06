@@ -106,9 +106,9 @@ def main():
     argparser.add_argument(
         '--tm-port',
         metavar='P',
-        default=8000,
+        default=6000,
         type=int,
-        help='Port to communicate with TM (default: 8000)')
+        help='Port to communicate with TM (default: 6000)')
     argparser.add_argument(
         '--asynch',
         action='store_true',

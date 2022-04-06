@@ -20,8 +20,8 @@ class VehiclePIDController():
     """
 
 
-    def __init__(self, vehicle, args_lateral, args_longitudinal, offset=0, max_throttle=0.75, max_brake=0.3,
-                 max_steering=0.8):
+    def __init__(self, vehicle, args_lateral, args_longitudinal, offset=0, max_throttle=1.0, max_brake=0.3,
+                 max_steering=0.7):
         """
         Constructor method.
 
@@ -106,7 +106,7 @@ class PIDLongitudinalController():
     PIDLongitudinalController implements longitudinal control using a PID.
     """
 
-    def __init__(self, vehicle, K_P=1.0, K_I=0.0, K_D=0.0, dt=0.03):
+    def __init__(self, vehicle, K_P=1.0, K_I=0.5, K_D=0.1, dt=0.03):
         """
         Constructor method.
 
@@ -172,7 +172,7 @@ class PIDLateralController():
     PIDLateralController implements lateral control using a PID.
     """
 
-    def __init__(self, vehicle, offset=0, K_P=1.0, K_I=0.0, K_D=0.0, dt=0.03):
+    def __init__(self, vehicle, offset=0, K_P=1.0, K_I=0.5, K_D=0.1, dt=0.03):
         """
         Constructor method.
 

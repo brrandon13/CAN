@@ -58,6 +58,9 @@ import weakref
 import can
 import cantools
 
+import socket
+from threading import Thread
+
 import pygame
 from pygame.locals import K_DOWN
 from pygame.locals import K_ESCAPE
@@ -77,15 +80,22 @@ class World(object):
         self.map = self.world.get_map()
         self.actor = None
         self.sensor_manager = None
+        self.actor_id = None
+
+        self.get_target_id()
 
         self.start()
 
-    def start(self):
-        target_id = 0
-        # get target_id(int) 
-        self.actor = self.world.get_actor(target_id)  # carla.Vehicle
-        pass
+    def get_target_id(self):
+        s = socket.socket()
+        print('connecting to server...')
+        s.connect(('localhost',8000))
+        self.actor_id = int(s.recv(24).decode(encoding="utf-8"))
 
+    def start(self):
+        # get target_id(int) 
+        self.actor = self.world.get_actor(self.actor_id)  # carla.Vehicle
+        print(f'actor acquired: {self.actor.type_id}')
 
 class SensorManager(object):
     def __init__(self, parent_actor):
@@ -118,27 +128,56 @@ def game_loop(args):
             # set the world to synchronous mode
             if not settings.synchronous_mode:
                 settings.synchronous_mode = True
-                settings.fixed_delta_seconds = 0.02 
+                settings.fixed_delta_seconds = 0.03
             sim_world.apply_settings(settings)
 
             traffic_manager = client.get_trafficmanager()
             traffic_manager.set_synchronous_mode(True)
+            
+        world = World(sim_world)  # WORLD
+        agent = CAN(world.actor) # get actor from can_control_by_agent.py
+
+        # Set the agent destination
+        spawn_points = world.map.get_spawn_points()
+        destination = random.choice(spawn_points).location
+        agent.set_destination(destination)
+
+        clock = pygame.time.Clock()
 
         while True:
-            pass
+            clock.tick()
+            if args.sync:
+                world.world.tick()
+            else:
+                world.world.wait_for_tick()
+
+            if agent.done():
+                agent.set_destination(random.choice(spawn_points).location)
+                # world.hud.notification("The target has been reached, searching for another target", seconds=4.0)
+                print("The target has been reached, searching for another target")
             
 
-    finally:
+            th1 = Thread(target=agent._send_control_cmd)
+            th2 = Thread(target=agent._send_driving_cmd)
+            th3 = Thread(target=agent._get_vehicle_info_1)
+            th4 = Thread(target=agent._get_vehicle_info_2)
 
+            
+            th1.start()
+            th2.start()
+            th3.start()
+            th4.start()
+            
+            th1.join()
+            th2.join()
+            th3.join() 
+            th4.join()
+
+    finally:
+        print("Exiting simulation..")
         if original_settings:
             sim_world.apply_settings(original_settings)
-
-        if (world and world.recording_enabled):
-            client.stop_recorder()
-
-        if world is not None:
-            world.destroy()
-
+        
         pygame.quit()
 
 
@@ -167,41 +206,15 @@ def main():
         type=int,
         help='TCP port to listen to (default: 2000)')
     argparser.add_argument(
-        '-a', '--autopilot',
-        action='store_true',
-        help='enable autopilot')
-    argparser.add_argument(
-        '--res',
-        metavar='WIDTHxHEIGHT',
-        default='960x540',
-        help='window resolution (default: 1280x720)')
-    argparser.add_argument(
-        '--filter',
-        metavar='PATTERN',
-        default='vehicle.*',
-        help='actor filter (default: "vehicle.*")')
-    argparser.add_argument(
-        '--generation',
-        metavar='G',
-        default='2',
-        help='restrict to certain actor generation (values: "1","2","All" - default: "2")')
-    argparser.add_argument(
         '--rolename',
         metavar='NAME',
-        default='hero',
-        help='actor role name (default: "hero")')
-    argparser.add_argument(
-        '--gamma',
-        default=2.2,
-        type=float,
-        help='Gamma correction of the camera (default: 2.2)')
+        default='sensors',
+        help='actor role name (default: "sensors")')
     argparser.add_argument(
         '--sync',
         action='store_true',
         help='Activate synchronous mode execution')
     args = argparser.parse_args()
-
-    args.width, args.height = [int(x) for x in args.res.split('x')]
 
     log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
@@ -213,7 +226,7 @@ def main():
 
     except KeyboardInterrupt:
         print('\nCancelled by user. Bye!')
-
+        return
 
 if __name__ == '__main__':
     main()

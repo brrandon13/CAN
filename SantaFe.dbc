@@ -35,12 +35,6 @@ BS_:
 
 BU_:
 
-
-BO_ 3221225472 VECTOR__INDEPENDENT_SIG_MSG: 0 Vector__XXX
-SG_ NewSignal_0007 : 24|8@1+ (1,0) [0|0] "" Vector__XXX
-SG_ NewSignal_0008 : 32|8@1+ (1,0) [0|0] "" Vector__XXX
-SG_ NewSignal_0006 : 16|8@1+ (1,0) [0|0] "" Vector__XXX
-
 BO_ 336 Control_CMD: 8 Vector__XXX
 SG_ Override_Off : 7|8@0+ (1,0) [0|1] "None" Vector__XXX
 SG_ Alive_Count : 15|8@0+ (1,0) [0|255] "None" Vector__XXX
@@ -96,7 +90,10 @@ CM_ SG_ 84 Wheel_Speed_Front_Right "Front Right";
 CM_ SG_ 84 Wheel_Speed_Front_Left "Front Left";
 CM_ SG_ 84 Wheel_Speed_Rear_Left "Rear Left";
 CM_ SG_ 84 Wheel_Speed_Rear_Right "Rear Right";
-VAL_ 336 Override_Off 0 "override_on" 1 "override_off" ;
-VAL_ 338 Gear_Shift_CMD 0 "Parking" 5 "Driving" 6 "Neutral" 7 "Reverse" ;
-VAL_ 81 Gear_Shift_Feedback 0 "Parking" 5 "Driving" 6 "Neutral" 7 "Reverse" ;
-VAL_ 82 Override_Feedback 0 "Manual" 1 "Auto" 2 "Steer" 3 "Accel" 4 "Brake" 5 "Sensor" 6 "E-Stop" ;
+
+VAL_ 336 Override_Off 0 "Override_On" 1 "Override_Off" ;
+VAL_ 338 Gear_shift_CMD 0 "Parking" 5 "Driving" 6 "Neutral" 7 "Reverse" ;
+VAL_ 81 Gear_shift_Feedback 0 "Parking" 5 "Driving" 6 "Neutral" 7 "Reverse" ;
+VAL_ 81 Switch_state 0 "Manual" 1 "E-stop" 2 "Auto-standby" 4 "APM S/W On" 8 "ASM S/W On" 16 "AGM S/W On" ;
+VAL_ 82 Override_feedback 0 "Manual" 1 "Auto" 2 "Steer" 3 "Accel" 4 "Brake" 5 "Sensor" 6 "E-Stop" ;
+VAL_ 82 Turn_Sig_feed 0 "Lamp_Off" 1 "Left_Lamp_Open" 2 "Right_Lamp_Open" 4 "Hazard_Lamp_Open" ;
