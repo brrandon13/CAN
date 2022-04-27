@@ -11,7 +11,7 @@ class GPS:
             self.gps = 0
     
     def readMsg(self):
-        while True:
+        while self.gps:
             msg = self.gps.readline()
             decoded_msg = msg.decode("utf-8")
             data = decoded_msg.split(",")
