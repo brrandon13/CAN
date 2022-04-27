@@ -1,7 +1,7 @@
 import geopy
 import serial
 
-ser = 0
+
 
 class GPS:
     def __init__(self):
@@ -20,14 +20,28 @@ class GPS:
                 status = data[2]
                 if status == 'A':
                     
-                    lat = data[3]
+                    lat = float(data[3])
                     latDir = data[4]
-                    lon = data[5]
+                    lon = float(data[5])
                     lonDir = data[6]
-                    kmh = data[7] * 1.852
+                    kmh = float(data[7]) * 1.852
 
-                    return [lat, latDir, lon, lonDir, kmh]
-        return []
+                    return (lat, latDir, lon, lonDir, kmh)
 
+    def position(self):
+        ret = []
+        message = self.readMsg()
+        if message:
+            if message[1] == 'N':
+                ret.append(message[0])
+            else:
+                ret.append(-message[0])
+                
+            if message[3] == 'E':
+                ret.append(message[2])
+            else:
+                ret.append(-message[2])
+
+        return ret
 
 
