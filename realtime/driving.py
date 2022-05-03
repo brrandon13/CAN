@@ -1,6 +1,23 @@
+#!/usr/bin/env python3
+
 from can_module import CAN, DRIVE, PARKING
 import pygame
-import threading
+import rospy
+from sensor_msgs.msg import NavSatFix
+
+global longitude
+global latitude
+
+def gps_callback(data):
+    global latitude, longitude
+    latitude = data.latitude
+    longitude = data.longitude
+
+def gps():
+    rospy.init_node('topic_reader')
+    rospy.Subscriber('gps_out', NavSatFix, gps_callback)
+    rospy.spin()
+
 
 leftdown = (35.229918, 126.840906)
 rightup  = (35.230695, 126.842483)
@@ -11,25 +28,35 @@ dest = (25.230071, 126.842450)
 
 dt = 0.02  # sec
 
-can = CAN(dest)  # target_position
+def main():
+    global latitude, longitude
 
-clock = pygame.time.Clock()
+    can = CAN(dest)  # target_position
+    gps() # initiate gps subscriber
 
-# start override
-can.start_autopilot()
+    clock = pygame.time.Clock()
 
-# change gear P to D
-can.change_gear(DRIVE)
+    # start override
+    can.start_autopilot()
 
-while True:
-    if can.control():
-        break
-    can.get_feedback()
+    # change gear P to D
+    can.change_gear(DRIVE)
+
+    while not can.reached_destination((latitude, longitude)):
+
+        can.control((latitude, longitude))
+        clock.tick_busy_loop(50)  # 1 tick = 20ms
+        can.get_feedback()
+
+    else:
+        # change gear D to P
+        can.change_gear(PARKING)
+
+        # finish override
+        can.done()
+    return 
+
+if __name__=="__main__":
+    main()
     
-can.change_gear(PARKING)
-can.done()
-
-
-
-
 

@@ -1,10 +1,11 @@
-from email import message
 import cantools
 import can
 import threading
-from collections import deque
-from gps_module import GPS
-import numpy as np
+from pygame import time
+from geopy import distance
+from controller import LongitudinalController
+
+
 
 DRIVE =  5
 PARKING = 0
@@ -18,6 +19,8 @@ VEHICLE_INFO_2 = 4
 CYCLE_FPS = 50
 
 dt = 0.02
+
+global lat, lon
 
 
 class CAN:
@@ -40,14 +43,13 @@ class CAN:
         self.driving_cmd_dict = {'Accel_CMD':650,'Brake_CMD':0,'Steering_CMD':0,'Gear_Shift_CMD':5, 'Reserved':0}     
 
         self.destination = destination
-        if self.destination is None:
-            self.destination = self.gps.position()
 
-        self.max_speed = 25  # km/h
+        self.max_speed = 7  # m/s 
+        self.clock = time.Clock()
 
         self.cur_dist = 0
 
-        self.gps = GPS()
+        self.controller = LongitudinalController(self.destination, self.max_speed)
     
     def get_feedback(self):
         th1 = threading.Thread(target=self.get_vehicle_info_1)
@@ -72,48 +74,47 @@ class CAN:
         return ((old_value - old_min) / (old_max - old_min) ) * (new_max - new_min) + new_min
 
     def start_autopilot(self):
+        print("starting autopilot ...", end=" ")
         while self.info_1_dict["Override_Feedback"] != 1:
+            self.clock.tick_busy_loop(50)
             self.send_control()
+        print("done.")
 
     def change_gear(self, gear):
-        if self.info_2_dict["Vehicle_Speed"] == 0 and self.driving_cmd_dict["Break_ACT_Feedback"] >= 30000:
-            self.driving_cmd_dict["Gear_Shift_CMD"] = gear
+        print("changing gear ...", end=" ")
+        while self.info_1_dict["Gear_Shift_Feedback"] != gear:
+            self.clock.tick_busy_loop(50)
+            if self.info_2_dict["Vehicle_Speed"] == 0 and self.driving_cmd_dict["Brake_ACT_Feedback"] >= 20000:
+                self.driving_cmd_dict["Gear_Shift_CMD"] = gear
+            else:
+                self.driving_cmd_dict["Brake_CMD"] += 1000
             self.send_control()
-            return
-        else:
-            self.driving_cmd_dict["Break_CMD"] = 16500
-            self.send_control()
-            self.change_gear(gear)
+        print("done")
     
-    def done(self):
-        self.control_cmd_dict["Override_Off"] = 1
-        self.driving_cmd_dict["Break_CMD"] = 17000
-        self.send_control()
-
-    def reached_destination(self):
-        cur_position = self.gps.position()
-        if abs(cur_position[0] - self.destination[0]) + abs(cur_position[1] - self.destination[1]) < 0.000015:
+    def reached_destination(self, cur_position):
+        if distance.distance(self.destination, cur_position) <= 0.001:
+            print("reached destination. stopping...")
             return True
         return False
 
-    def control(self):
+    def done(self):
+        print("driving finished")
+        self.control_cmd_dict["Override_Off"] = 1
+        self.send_control()
+
+    def control(self, position):
         if self.info_1_dict["Override_Feedback"] != 1:
             return True
+        cur_speed = self.info_2_dict["Vehicle_Speed"]
+        accel = self.controller.run_step(cur_speed, position)
 
-        if not self.reached_destination:
-            if self.info_2_dict["Vehicle_Speed"] < self.max_speed:
-                self.driving_cmd_dict["Accel_CMD"] = 1000
-            else:
-                self.driving_cmd_dict["Accel_CMD"] = 0
+        if accel > 0:
+            self.driving_cmd_dict["Accel_CMD"] = accel * 200 + 650
         else:
-            if self.driving_cmd_dict["Accel_CMD"] != 0:
-                self.driving_cmd_dict["Accel_CMD"] = 0
-            self.driving_cmd_dict["Break_CMD"] = max(self.driving_cmd_dict["Break_CMD"] + 100, 16999)
+            self.driving_cmd_dict["Accel_CMD"] = 0
+            self.driving_cmd_dict["Brake_CMD"] = -accel * 1000
 
-            if self.info_2_dict["Vehicle_Speed"] == 0:
-                return True
         self.send_control()
-        return False
 
     def get_vehicle_info_1(self):
         try:
@@ -121,10 +122,6 @@ class CAN:
             data = self.db.decode_message(msg.arbitration_id, msg.data)
             if msg.arbitration_id == self.vehicle_info_1_msg.frame_id:
                 self.info_1_dict = data
-                if self.info_1_dict["Switch_State"] == 30:
-                    self.auto_stanby = True
-                else:
-                    self.auto_stanby = False
         except:
             return 0
 
@@ -134,15 +131,12 @@ class CAN:
             data = self.db.decode_message(msg.arbitration_id, msg.data)
             if msg.arbitration_id == self.vehicle_info_2_msg.frame_id:
                 self.info_2_dict = data
-                if self.info_2_dict["Override_Feedback"] != 0:
-                    return 0
         except:
             return 0
 
     def send_control_cmd(self):
         # print("_send_command")
-        self.control_cmd_dict['Alive_Count'] += 1
-        self.control_cmd_dict['Alive_Count'] %= 256
+        self.control_cmd_dict['Alive_Count'] = (self.control_cmd_dict['Alive_Count'] + 1) % 256
         data = self.control_cmd_msg.encode(self.control_cmd_dict)
         message = can.Message(arbitration_id=self.control_cmd_msg.frame_id, data=data,is_extended_id=False)
         self.bus.send(message)
