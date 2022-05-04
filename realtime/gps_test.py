@@ -1,23 +1,31 @@
-from gps_module import GPS
-import pygame
+import rospy
 import time
-
-def main():
-
-    gps = GPS()
-
-    if not gps.gps:
-        print("GPS has not been found. try changing the PORT")
-        return
+from sensor_msgs.msg import NavSatFix
 
 
-    clock = pygame.time.Clock()
+class GPS:
+    def __init__(self):
+        self.latitude = 0
+        self.longitude = 0
+        self.init()
 
-    t_end = time.time() + 60 * 1
+    def init(self):
+        rospy.init_node('gps_test')
+        rospy.Subscriber('/gps/fix', NavSatFix, self.callback)
+        rospy.spin()
 
-    while time.time() < t_end:
-        clock.tick_busy_loop(2)  # fps = 2
-        print(gps.readMsg)
+    def callback(self,data):
+        self.latitude = data.latitude
+        self.longitude = data.longitude
 
-if __name__ == "__main__":
-    main()
+    def get_current_position(self):
+        print(f"Lat: {self.latitude} Lon: {self.longitude}")
+
+
+gps = GPS()
+t = 0
+while t < 20:
+    gps.get_current_position()
+    time.sleep(1)
+    t += 1
+
