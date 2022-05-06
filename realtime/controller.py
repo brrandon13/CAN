@@ -19,24 +19,35 @@ class LongitudinalController:
         self.max_accel = max_accel
         self.destination = destination
 
-    def target_speed(self, distance):
-        if distance < self.max_speed**2/(2*self.max_accel):
-            ret = sqrt(2*self.max_accel*distance)
+        self.path = deque()  # (coordinate, target_velocity)
+
+    # return recommended velocity either path exists or not
+    def target_speed(self, cur_position):
+        
+        if self.path:
+            if distance.distance(self.path[0], cur_position) <= 0.001:
+                return self.popleft()[1]
+            else:
+                return self.path[0][1]
+                
+        # if path doesn't exist get recommend velocity 
+        dist = distance.distance(self.destination, cur_position) * 1000  # km to m
+        if dist< self.max_speed**2/(2*self.max_accel):
+            ret = sqrt(2*self.max_accel*dist)
         else:
             ret = self.max_speed
         return ret
 
-
-    def run_step(self, cur_speed, cur_position):
+    def run_step(self, cur_speed, cur_accel, cur_position):
         '''
         a = Kp(v_t - v_c) + Ki Int(v_t - v_c) + Kd d/dt(v_t-v_c)
         
         '''
         if self.destination:
-            dist = distance.distance(self.destination, cur_position) * 1000  # km to m
-            target_speed = self.target_speed(dist)
+            
+            target_speed = self.target_speed(cur_position)
 
-            error = target_speed - cur_speed
+            error = target_speed - (cur_speed + cur_accel * self._dt)
             self._error_buffer.append(error)
 
             if len(self._error_buffer) >= 2:

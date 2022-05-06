@@ -1,7 +1,12 @@
 import rospy
 import time
-from sensor_msgs.msg import NavSatFix
+from gps_common.msg import GPSFix
+from sensor_msgs.msg import Imu, NavSatFix
 
+
+class GPS_and_IMU:
+    def __init__(self):
+        pass
 
 class GPS:
     def __init__(self):

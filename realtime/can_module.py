@@ -109,7 +109,7 @@ class CAN:
         accel = self.controller.run_step(cur_speed, position)
 
         if accel > 0:
-            self.driving_cmd_dict["Accel_CMD"] = accel * 200 + 650
+            self.driving_cmd_dict["Accel_CMD"] = accel * 100 + 650
         else:
             self.driving_cmd_dict["Accel_CMD"] = 0
             self.driving_cmd_dict["Brake_CMD"] = -accel * 1000
